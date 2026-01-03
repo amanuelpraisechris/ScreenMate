@@ -21,6 +21,7 @@ const AgreementMetrics = () => {
 
   useEffect(() => {
     loadMetrics();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentProject]);
 
   const loadMetrics = async () => {
