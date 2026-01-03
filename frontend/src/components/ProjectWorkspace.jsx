@@ -259,6 +259,11 @@ const ProjectWorkspace = ({ onBack }) => {
             <ScreeningInterface />
           </TabsContent>
 
+          {/* Metrics Tab */}
+          <TabsContent value="metrics">
+            <AgreementMetrics />
+          </TabsContent>
+
           {/* Conflicts Tab */}
           <TabsContent value="conflicts">
             <ConflictsPanel />
