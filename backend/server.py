@@ -609,6 +609,54 @@ async def get_study_screening_history(project_id: str, study_id: str):
     return records
 
 
+@api_router.post("/projects/{project_id}/studies/{study_id}/ai-screening-suggestion")
+async def get_ai_screening_suggestion(
+    project_id: str,
+    study_id: str,
+    criteria: Optional[str] = None
+):
+    """Get AI suggestion for screening a study."""
+    if not llm_client:
+        raise HTTPException(
+            status_code=503,
+            detail="AI screening not available - no LLM key configured"
+        )
+    
+    try:
+        suggestion = await ai_screening_service.get_ai_suggestion(
+            study_id=study_id,
+            project_id=project_id,
+            criteria=criteria
+        )
+        return suggestion
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@api_router.post("/projects/{project_id}/ai-screening-batch")
+async def get_batch_ai_suggestions(
+    project_id: str,
+    study_ids: List[str],
+    criteria: Optional[str] = None
+):
+    """Get AI suggestions for multiple studies."""
+    if not llm_client:
+        raise HTTPException(
+            status_code=503,
+            detail="AI screening not available - no LLM key configured"
+        )
+    
+    try:
+        suggestions = await ai_screening_service.get_batch_suggestions(
+            project_id=project_id,
+            study_ids=study_ids,
+            criteria=criteria
+        )
+        return suggestions
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 # ============== Conflicts ==============
 @api_router.get("/projects/{project_id}/conflicts")
 async def get_conflicts(
