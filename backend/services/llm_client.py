@@ -19,7 +19,7 @@ class LLMClient:
             raise ValueError("No API key configured for LLM")
         
         try:
-            # Lazy import to avoid issues if not installed
+            # Use emergentintegrations for LLM calls
             from emergentintegrations.llm.openai import generate_text
             
             response = await generate_text(
@@ -28,8 +28,8 @@ class LLMClient:
                 model=model
             )
             return response
-        except ImportError:
-            logger.error("emergentintegrations not installed")
+        except ImportError as e:
+            logger.error(f"emergentintegrations not installed: {e}")
             raise ValueError("LLM integration not available")
         except Exception as e:
             logger.error(f"LLM generation failed: {e}")
