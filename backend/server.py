@@ -32,6 +32,7 @@ from services.screening_service import ScreeningService
 from services.extraction_service import ExtractionService
 from services.export_service import ExportService
 from services.llm_client import LLMClient
+from services.import_parsers import parse_import_file, detect_format
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
