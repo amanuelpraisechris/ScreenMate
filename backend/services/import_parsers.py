@@ -178,7 +178,6 @@ class ENWParser(ImportParser):
         """Parse EndNote text export format."""
         studies = []
         current_study = {}
-        current_field = None
         current_authors = []
         
         lines = content.split('\n')
