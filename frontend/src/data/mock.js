@@ -17,10 +17,10 @@ export const mediaLogos = [
 ];
 
 export const databaseIntegrations = [
-  { name: 'ERIC', icon: '📚', color: '#4A7C59' },
-  { name: 'OpenAlex', icon: '🔬', color: '#C74B4B' },
-  { name: 'PubMed', icon: '🏥', color: '#2E5984' },
-  { name: 'Zotero', icon: '📖', color: '#CC2936' },
+  { name: 'ERIC', icon: '📚', color: '#4A7C59', image: 'https://eric.ed.gov/img/eric-logo.svg' },
+  { name: 'OpenAlex', icon: '🔬', color: '#C74B4B', image: null },
+  { name: 'PubMed', icon: '🏥', color: '#2E5984', image: null },
+  { name: 'Zotero', icon: '📖', color: '#CC2936', image: null },
 ];
 
 export const features = [
