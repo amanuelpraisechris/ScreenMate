@@ -20,7 +20,7 @@ const HeroSection = () => {
           <Button 
             className="bg-[#6B8E7B] hover:bg-[#5a7a69] text-white px-8 py-6 rounded-full text-base font-medium inline-flex items-center gap-2 transition-all duration-300 hover:shadow-lg hover:shadow-[#6B8E7B]/20"
           >
-            Get started <span className="text-white/80">— it's free</span>
+            Get started <span className="text-white/80">— it&apos;s free</span>
           </Button>
         </div>
 
