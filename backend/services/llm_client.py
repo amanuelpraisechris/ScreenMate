@@ -1,6 +1,7 @@
 """Simple LLM client wrapper for AI extraction using Emergent integrations."""
 import os
 import logging
+import uuid
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -11,14 +12,6 @@ class LLMClient:
     
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or os.environ.get('EMERGENT_LLM_KEY')
-        self._chat = None
-    
-    def _get_chat(self):
-        """Lazy initialization of chat client."""
-        if self._chat is None:
-            from emergentintegrations.llm.openai import LlmChat
-            self._chat = LlmChat(api_key=self.api_key).with_model("gpt-4o-mini")
-        return self._chat
     
     async def generate(self, prompt: str, model: str = "gpt-4o-mini") -> str:
         """Generate text using the LLM."""
@@ -28,8 +21,16 @@ class LLMClient:
         try:
             from emergentintegrations.llm.openai import LlmChat
             
-            # Create a new chat instance for each request to avoid state issues
-            chat = LlmChat(api_key=self.api_key).with_model(model)
+            # Create a new chat instance for each request
+            session_id = str(uuid.uuid4())
+            system_message = "You are a helpful assistant for systematic review screening and data extraction."
+            
+            chat = LlmChat(
+                api_key=self.api_key,
+                session_id=session_id,
+                system_message=system_message
+            ).with_model(model)
+            
             response = await chat.send_message(prompt)
             return response
         except ImportError as e:
