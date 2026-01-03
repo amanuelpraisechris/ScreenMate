@@ -1,6 +1,13 @@
 import React from 'react';
-import { features, databaseIntegrations } from '../data/mock';
-import { ArrowRight, Check, X, Search, FileText, BarChart3, Users } from 'lucide-react';
+import { features } from '../data/mock';
+import { ArrowRight, Check, X, Search, FileText, BookOpen, Database, Archive } from 'lucide-react';
+
+const databaseIntegrations = [
+  { name: 'ERIC', icon: BookOpen, color: '#4A7C59' },
+  { name: 'OpenAlex', icon: Database, color: '#C74B4B' },
+  { name: 'PubMed', icon: FileText, color: '#2E5984' },
+  { name: 'Zotero', icon: Archive, color: '#CC2936' },
+];
 
 const FeatureIllustration = ({ featureId }) => {
   const illustrations = {
