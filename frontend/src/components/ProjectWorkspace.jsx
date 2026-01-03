@@ -8,6 +8,7 @@ import ScreeningInterface from './ScreeningInterface';
 import ConflictsPanel from './ConflictsPanel';
 import ExtractionWorkspace from './ExtractionWorkspace';
 import ExportPanel from './ExportPanel';
+import AgreementMetrics from './AgreementMetrics';
 import {
   ArrowLeft,
   FileText,
@@ -21,6 +22,7 @@ import {
   Upload,
   Search,
   Database,
+  BarChart3,
 } from 'lucide-react';
 
 const ProjectWorkspace = ({ onBack }) => {
