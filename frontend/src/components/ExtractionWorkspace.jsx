@@ -413,7 +413,7 @@ const ExtractionWorkspace = () => {
                             )}
                             {value.quote && (
                               <p className="text-sm text-gray-600 mt-2 italic">
-                                "{value.quote}"
+                                &quot;{value.quote}&quot;
                                 {value.page && <span className="text-gray-400"> (p. {value.page})</span>}
                               </p>
                             )}
