@@ -33,6 +33,7 @@ from services.extraction_service import ExtractionService
 from services.export_service import ExportService
 from services.llm_client import LLMClient
 from services.import_parsers import parse_import_file, detect_format
+from services.ai_screening_service import AIScreeningService
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
@@ -50,6 +51,7 @@ if emergent_key:
     llm_client = LLMClient(emergent_key)
 
 extraction_service = ExtractionService(db, llm_client)
+ai_screening_service = AIScreeningService(db, llm_client)
 export_service = ExportService(db)
 
 # Create FastAPI app
