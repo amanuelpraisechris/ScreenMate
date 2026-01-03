@@ -201,8 +201,8 @@ class ExtractionService:
         # Call AI for extraction
         suggestion = await self._call_ai_extraction(text_to_analyze, field, study_doc)
         
-        # Get extraction record and update with AI suggestion
-        extraction = await self.get_or_create_extraction(study_id, study_doc.get('project_id', ''), template_id)
+        # Get extraction record - just for audit logging
+        await self.get_or_create_extraction(study_id, study_doc.get('project_id', ''), template_id)
         
         # Log the AI suggestion
         await self.audit.log(
