@@ -195,17 +195,20 @@ const FeaturesSection = () => {
             When you review literature in Silvi you can import studies from anywhere. Silvi is even integrated directly to some databases, letting you save a search with one click.
           </p>
           <div className="flex flex-wrap justify-center gap-4">
-            {databaseIntegrations.map((db) => (
-              <a
-                key={db.name}
-                href="#"
-                className="flex items-center gap-2 bg-white border border-gray-200 rounded-full px-5 py-3 hover:shadow-md hover:border-[#6B8E7B] transition-all duration-300 group"
-              >
-                <span className="text-xl">{db.icon}</span>
-                <span className="font-medium text-gray-700 group-hover:text-[#6B8E7B]">{db.name}</span>
-                <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-[#6B8E7B] group-hover:translate-x-1 transition-all" />
-              </a>
-            ))}
+            {databaseIntegrations.map((db) => {
+              const Icon = db.icon;
+              return (
+                <a
+                  key={db.name}
+                  href="#"
+                  className="flex items-center gap-2 bg-white border border-gray-200 rounded-full px-5 py-3 hover:shadow-md hover:border-[#6B8E7B] transition-all duration-300 group"
+                >
+                  <Icon className="w-5 h-5" style={{ color: db.color }} />
+                  <span className="font-medium text-gray-700 group-hover:text-[#6B8E7B]">{db.name}</span>
+                  <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-[#6B8E7B] group-hover:translate-x-1 transition-all" />
+                </a>
+              );
+            })}
           </div>
         </div>
 
