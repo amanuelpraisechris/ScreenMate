@@ -37,6 +37,7 @@ const ExtractionWorkspace = () => {
 
   useEffect(() => {
     loadIncludedStudies();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentProject]);
 
   const loadIncludedStudies = async () => {
