@@ -51,6 +51,10 @@ export const screeningApi = {
       { params: { reviewer_id: reviewerId } }
     ),
   getHistory: (projectId, studyId) => api.get(`/projects/${projectId}/studies/${studyId}/screening`),
+  getAISuggestion: (projectId, studyId, criteria = null) =>
+    api.post(`/projects/${projectId}/studies/${studyId}/ai-screening-suggestion`, {}, { params: { criteria } }),
+  getBatchAISuggestions: (projectId, studyIds, criteria = null) =>
+    api.post(`/projects/${projectId}/ai-screening-batch`, { study_ids: studyIds }, { params: { criteria } }),
 };
 
 // Conflicts
