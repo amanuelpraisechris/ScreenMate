@@ -104,6 +104,10 @@ const ProjectWorkspace = ({ onBack }) => {
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="import">Import Studies</TabsTrigger>
             <TabsTrigger value="screening">Screening</TabsTrigger>
+            <TabsTrigger value="metrics">
+              <BarChart3 className="w-4 h-4 mr-1" />
+              Metrics
+            </TabsTrigger>
             <TabsTrigger value="conflicts">
               Conflicts
               {projectStats.conflicts_pending > 0 && (
