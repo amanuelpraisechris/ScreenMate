@@ -3,7 +3,7 @@ import { navigationItems } from '../data/mock';
 import { Menu, X } from 'lucide-react';
 import { Button } from './ui/button';
 
-const Header = () => {
+const Header = ({ onGetStarted }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
@@ -32,6 +32,7 @@ const Header = () => {
               </a>
             ))}
             <Button 
+              onClick={onGetStarted}
               className="bg-[#4A5A4F] hover:bg-[#3d4a41] text-white px-5 py-2 rounded-full text-sm font-medium transition-all duration-200"
             >
               Sign in
@@ -62,6 +63,7 @@ const Header = () => {
                 </a>
               ))}
               <Button 
+                onClick={onGetStarted}
                 className="bg-[#4A5A4F] hover:bg-[#3d4a41] text-white px-5 py-2 rounded-full text-sm font-medium w-fit"
               >
                 Sign in
