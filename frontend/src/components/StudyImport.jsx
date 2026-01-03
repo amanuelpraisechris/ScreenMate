@@ -244,7 +244,7 @@ Study Title 2	Another abstract	Johnson B	2023	Science	10.5678/def"
           <li>• For bulk import, use tab-delimited format (copy from Excel)</li>
           <li>• Authors should be separated by semicolons in bulk import</li>
           <li>• Title is the only required field</li>
-          <li>• Studies will be added with "imported" status ready for screening</li>
+          <li>• Studies will be added with &quot;imported&quot; status ready for screening</li>
         </ul>
       </div>
     </div>
