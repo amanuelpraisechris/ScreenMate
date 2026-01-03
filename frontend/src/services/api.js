@@ -20,6 +20,7 @@ export const projectsApi = {
   create: (data) => api.post('/projects', data),
   update: (id, data) => api.patch(`/projects/${id}`, data),
   getStats: (id) => api.get(`/projects/${id}/stats`),
+  getAgreementMetrics: (id) => api.get(`/projects/${id}/agreement-metrics`),
 };
 
 // Studies
