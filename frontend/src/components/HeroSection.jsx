@@ -2,7 +2,7 @@ import React from 'react';
 import { Button } from './ui/button';
 import { ArrowRight, Check, X, Search, ChevronRight } from 'lucide-react';
 
-const HeroSection = () => {
+const HeroSection = ({ onGetStarted }) => {
   return (
     <section className="relative pt-16 pb-24 md:pt-24 md:pb-32 overflow-hidden bg-gradient-to-b from-white to-gray-50/50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -18,6 +18,7 @@ const HeroSection = () => {
             scientific evidence
           </p>
           <Button 
+            onClick={onGetStarted}
             className="bg-[#6B8E7B] hover:bg-[#5a7a69] text-white px-8 py-6 rounded-full text-base font-medium inline-flex items-center gap-2 transition-all duration-300 hover:shadow-lg hover:shadow-[#6B8E7B]/20"
           >
             Get started <span className="text-white/80">— it&apos;s free</span>
