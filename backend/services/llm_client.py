@@ -19,7 +19,7 @@ class LLMClient:
             raise ValueError("No API key configured for LLM")
         
         try:
-            from emergentintegrations.llm.openai import LlmChat
+            from emergentintegrations.llm.openai import LlmChat, UserMessage
             
             # Create a new chat instance for each request
             session_id = str(uuid.uuid4())
@@ -31,7 +31,9 @@ class LLMClient:
                 system_message=system_message
             ).with_model(provider, model)
             
-            response = await chat.send_message(prompt)
+            # Create proper user message
+            user_message = UserMessage(text=prompt)
+            response = await chat.send_message(user_message)
             return response
         except ImportError as e:
             logger.error(f"emergentintegrations not installed: {e}")
