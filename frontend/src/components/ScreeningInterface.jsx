@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { screeningApi } from '../services/api';
 import {
   Check,
   X,
@@ -15,6 +16,10 @@ import {
   Calendar,
   User,
   BookOpen,
+  Sparkles,
+  AlertCircle,
+  ThumbsUp,
+  ThumbsDown,
 } from 'lucide-react';
 
 const ScreeningInterface = () => {
@@ -35,6 +40,11 @@ const ScreeningInterface = () => {
   const [notes, setNotes] = useState('');
   const [processing, setProcessing] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
+  
+  // AI Suggestion state
+  const [aiSuggestion, setAiSuggestion] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [showAiPanel, setShowAiPanel] = useState(true);
 
   const exclusionReasons = [
     'Not relevant to research question',
@@ -48,6 +58,29 @@ const ScreeningInterface = () => {
     'Other',
   ];
 
+  // Reset AI suggestion when study changes
+  useEffect(() => {
+    setAiSuggestion(null);
+  }, [currentStudy?.id]);
+
+  const handleGetAISuggestion = async () => {
+    if (!currentStudy || !currentProject) return;
+    setAiLoading(true);
+    try {
+      const response = await screeningApi.getAISuggestion(currentProject.id, currentStudy.id);
+      setAiSuggestion(response.data);
+    } catch (err) {
+      console.error('Failed to get AI suggestion', err);
+      setAiSuggestion({
+        decision: 'error',
+        reasoning: err.response?.data?.detail || 'Failed to get AI suggestion',
+        is_available: false
+      });
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   const handleDecision = async (decision) => {
     if (!currentStudy) return;
 
@@ -60,6 +93,7 @@ const ScreeningInterface = () => {
     try {
       await recordScreeningDecision(currentStudy.id, decision, null, notes || null);
       setNotes('');
+      setAiSuggestion(null);
       // Move to next study
       if (currentIndex < pendingScreening.length - 1) {
         setCurrentStudy(pendingScreening[currentIndex + 1].study);
@@ -81,6 +115,7 @@ const ScreeningInterface = () => {
       setShowExcludeDialog(false);
       setExclusionReason('');
       setNotes('');
+      setAiSuggestion(null);
       // Move to next study
       if (currentIndex < pendingScreening.length - 1) {
         setCurrentStudy(pendingScreening[currentIndex + 1].study);
@@ -98,6 +133,16 @@ const ScreeningInterface = () => {
     if (newIndex >= 0 && newIndex < pendingScreening.length) {
       setCurrentIndex(newIndex);
       setCurrentStudy(pendingScreening[newIndex].study);
+      setAiSuggestion(null);
+    }
+  };
+
+  const getAIDecisionColor = (decision) => {
+    switch (decision) {
+      case 'include': return 'text-green-600 bg-green-50 border-green-200';
+      case 'exclude': return 'text-red-600 bg-red-50 border-red-200';
+      case 'maybe': return 'text-amber-600 bg-amber-50 border-amber-200';
+      default: return 'text-gray-600 bg-gray-50 border-gray-200';
     }
   };
 
@@ -111,6 +156,7 @@ const ScreeningInterface = () => {
               onClick={() => {
                 setScreeningStage('title_abstract');
                 setCurrentIndex(0);
+                setAiSuggestion(null);
               }}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 screeningStage === 'title_abstract'
@@ -124,6 +170,7 @@ const ScreeningInterface = () => {
               onClick={() => {
                 setScreeningStage('full_text');
                 setCurrentIndex(0);
+                setAiSuggestion(null);
               }}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 screeningStage === 'full_text'
@@ -237,6 +284,84 @@ const ScreeningInterface = () => {
 
           {/* Decision Panel */}
           <div className="space-y-4">
+            {/* AI Suggestion Panel */}
+            {showAiPanel && (
+              <div className="bg-white rounded-xl border border-gray-200 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-purple-500" />
+                    AI Suggestion
+                  </h3>
+                </div>
+
+                {aiLoading ? (
+                  <div className="flex items-center justify-center py-6">
+                    <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
+                  </div>
+                ) : aiSuggestion ? (
+                  <div className="space-y-3">
+                    {/* AI Decision */}
+                    <div className={`p-4 rounded-lg border ${getAIDecisionColor(aiSuggestion.decision)}`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-semibold capitalize">{aiSuggestion.decision}</span>
+                        {aiSuggestion.confidence && (
+                          <span className="text-sm opacity-75">
+                            {(aiSuggestion.confidence * 100).toFixed(0)}% confident
+                          </span>
+                        )}
+                      </div>
+                      {aiSuggestion.reasoning && (
+                        <p className="text-sm opacity-90">{aiSuggestion.reasoning}</p>
+                      )}
+                    </div>
+
+                    {/* Quick follow AI */}
+                    {aiSuggestion.is_available !== false && (
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleDecision(aiSuggestion.decision)}
+                          disabled={processing || aiSuggestion.decision === 'maybe'}
+                          className="flex-1"
+                        >
+                          <ThumbsUp className="w-4 h-4 mr-1" />
+                          Agree
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleGetAISuggestion}
+                          className="flex-1"
+                        >
+                          Refresh
+                        </Button>
+                      </div>
+                    )}
+
+                    <p className="text-xs text-gray-400 text-center">
+                      AI suggestions require human verification
+                    </p>
+                  </div>
+                ) : (
+                  <div className="text-center py-4">
+                    <p className="text-sm text-gray-500 mb-3">
+                      Get AI-powered screening suggestion
+                    </p>
+                    <Button
+                      onClick={handleGetAISuggestion}
+                      disabled={aiLoading}
+                      className="bg-purple-500 hover:bg-purple-600 text-white"
+                    >
+                      <Sparkles className="w-4 h-4 mr-2" />
+                      Get AI Suggestion
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Human Decision Panel */}
             <div className="bg-white rounded-xl border border-gray-200 p-6">
               <h3 className="font-semibold text-gray-900 mb-4">Your Decision</h3>
               
@@ -301,6 +426,7 @@ const ScreeningInterface = () => {
                 <p><kbd className="bg-gray-200 px-1.5 py-0.5 rounded">I</kbd> Include</p>
                 <p><kbd className="bg-gray-200 px-1.5 py-0.5 rounded">E</kbd> Exclude</p>
                 <p><kbd className="bg-gray-200 px-1.5 py-0.5 rounded">M</kbd> Maybe</p>
+                <p><kbd className="bg-gray-200 px-1.5 py-0.5 rounded">A</kbd> Get AI Suggestion</p>
                 <p><kbd className="bg-gray-200 px-1.5 py-0.5 rounded">←</kbd> Previous</p>
                 <p><kbd className="bg-gray-200 px-1.5 py-0.5 rounded">→</kbd> Next</p>
               </div>
