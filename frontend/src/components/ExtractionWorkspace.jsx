@@ -431,7 +431,7 @@ const ExtractionWorkspace = () => {
                                 <p className="text-gray-900 font-medium">{value._pending_suggestion.value}</p>
                                 {value._pending_suggestion.quote && (
                                   <p className="text-sm text-gray-600 mt-2 italic">
-                                    "{value._pending_suggestion.quote}"
+                                    &quot;{value._pending_suggestion.quote}&quot;
                                     {value._pending_suggestion.page && (
                                       <span className="text-gray-400"> (p. {value._pending_suggestion.page})</span>
                                     )}
