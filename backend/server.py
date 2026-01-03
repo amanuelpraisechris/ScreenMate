@@ -253,6 +253,98 @@ async def import_studies(project_id: str, batch: StudyImportBatch):
     }
 
 
+@api_router.post("/projects/{project_id}/studies/import-file", response_model=dict)
+async def import_studies_from_file(project_id: str, file: UploadFile = File(...)):
+    """Import studies from various file formats (RIS, EndNote, PubMed XML, BibTeX, CSV)."""
+    # Verify project exists
+    project = await db.projects.find_one({"id": project_id})
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    # Read file content
+    content = await file.read()
+    
+    # Try to decode as text
+    try:
+        text_content = content.decode('utf-8')
+    except UnicodeDecodeError:
+        try:
+            text_content = content.decode('latin-1')
+        except UnicodeDecodeError:
+            raise HTTPException(status_code=400, detail="Could not decode file. Please use UTF-8 encoding.")
+    
+    # Detect format and parse
+    filename = file.filename or ''
+    detected_format = detect_format(text_content, filename)
+    
+    if detected_format == 'unknown':
+        raise HTTPException(
+            status_code=400, 
+            detail="Could not detect file format. Supported formats: RIS, EndNote XML, PubMed XML, NBIB, BibTeX, CSV"
+        )
+    
+    # Parse studies
+    parsed_studies = parse_import_file(text_content, filename)
+    
+    if not parsed_studies:
+        raise HTTPException(status_code=400, detail="No studies found in file. Please check the file format.")
+    
+    # Import studies
+    imported_count = 0
+    imported_ids = []
+    duplicates_skipped = 0
+    
+    for study_data in parsed_studies:
+        # Check for duplicates by DOI or PMID or title
+        duplicate_query = {"project_id": project_id}
+        if study_data.get('doi'):
+            existing = await db.studies.find_one({**duplicate_query, "doi": study_data['doi']})
+            if existing:
+                duplicates_skipped += 1
+                continue
+        if study_data.get('pmid'):
+            existing = await db.studies.find_one({**duplicate_query, "pmid": study_data['pmid']})
+            if existing:
+                duplicates_skipped += 1
+                continue
+        
+        # Create study
+        study = Study(
+            project_id=project_id,
+            title=study_data.get('title', 'Untitled'),
+            abstract=study_data.get('abstract'),
+            authors=study_data.get('authors'),
+            year=study_data.get('year'),
+            journal=study_data.get('journal'),
+            doi=study_data.get('doi'),
+            pmid=study_data.get('pmid'),
+            source=study_data.get('source', detected_format),
+            metadata={k: v for k, v in study_data.items() if k not in ['title', 'abstract', 'authors', 'year', 'journal', 'doi', 'pmid', 'source']}
+        )
+        
+        doc = study.model_dump()
+        doc['created_at'] = serialize_datetime(doc['created_at'])
+        doc['updated_at'] = serialize_datetime(doc['updated_at'])
+        
+        await db.studies.insert_one(doc)
+        imported_count += 1
+        imported_ids.append(study.id)
+    
+    # Update project study count
+    if imported_count > 0:
+        await db.projects.update_one(
+            {"id": project_id},
+            {"$inc": {"study_count": imported_count}}
+        )
+    
+    return {
+        "imported_count": imported_count,
+        "duplicates_skipped": duplicates_skipped,
+        "detected_format": detected_format,
+        "study_ids": imported_ids
+    }
+
+
 @api_router.get("/projects/{project_id}/studies", response_model=List[dict])
 async def list_studies(
     project_id: str,
