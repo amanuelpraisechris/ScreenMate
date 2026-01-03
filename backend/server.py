@@ -173,6 +173,130 @@ async def get_project_stats(project_id: str):
     )
 
 
+@api_router.get("/projects/{project_id}/agreement-metrics")
+async def get_agreement_metrics(project_id: str):
+    """Get detailed agreement metrics for screening."""
+    # Get all screening records for the project
+    records = await db.screening_records.find(
+        {"project_id": project_id},
+        {"_id": 0}
+    ).to_list(10000)
+    
+    # Group by study and stage
+    study_decisions = {}
+    for record in records:
+        key = (record['study_id'], record['stage'])
+        if key not in study_decisions:
+            study_decisions[key] = []
+        study_decisions[key].append(record)
+    
+    # Calculate agreement metrics
+    ta_agreements = 0
+    ta_disagreements = 0
+    ta_single_reviewer = 0
+    ft_agreements = 0
+    ft_disagreements = 0
+    ft_single_reviewer = 0
+    
+    reviewer_stats = {}
+    
+    for (study_id, stage), decisions in study_decisions.items():
+        if len(decisions) >= 2:
+            # Check agreement
+            d1, d2 = decisions[0]['decision'], decisions[1]['decision']
+            agreed = d1 == d2
+            
+            if stage == 'title_abstract':
+                if agreed:
+                    ta_agreements += 1
+                else:
+                    ta_disagreements += 1
+            else:
+                if agreed:
+                    ft_agreements += 1
+                else:
+                    ft_disagreements += 1
+        else:
+            if stage == 'title_abstract':
+                ta_single_reviewer += 1
+            else:
+                ft_single_reviewer += 1
+        
+        # Track per-reviewer stats
+        for d in decisions:
+            rid = d['reviewer_id']
+            if rid not in reviewer_stats:
+                reviewer_stats[rid] = {'total': 0, 'include': 0, 'exclude': 0, 'maybe': 0}
+            reviewer_stats[rid]['total'] += 1
+            reviewer_stats[rid][d['decision']] += 1
+    
+    # Calculate agreement rates
+    ta_total_dual = ta_agreements + ta_disagreements
+    ft_total_dual = ft_agreements + ft_disagreements
+    
+    ta_agreement_rate = (ta_agreements / ta_total_dual * 100) if ta_total_dual > 0 else None
+    ft_agreement_rate = (ft_agreements / ft_total_dual * 100) if ft_total_dual > 0 else None
+    
+    # Get AI suggestion stats
+    ai_suggestions = await db.ai_screening_suggestions.find(
+        {"project_id": project_id},
+        {"_id": 0}
+    ).to_list(10000)
+    
+    ai_stats = {
+        "total_suggestions": len(ai_suggestions),
+        "include": sum(1 for s in ai_suggestions if s.get('decision') == 'include'),
+        "exclude": sum(1 for s in ai_suggestions if s.get('decision') == 'exclude'),
+        "maybe": sum(1 for s in ai_suggestions if s.get('decision') == 'maybe'),
+        "avg_confidence": sum(s.get('confidence', 0) for s in ai_suggestions) / len(ai_suggestions) if ai_suggestions else 0
+    }
+    
+    # Calculate AI-Human agreement (where both exist)
+    ai_human_agreement = 0
+    ai_human_total = 0
+    for suggestion in ai_suggestions:
+        study_id = suggestion['study_id']
+        # Find human decision for this study
+        human_decisions = [r for r in records if r['study_id'] == study_id and r['stage'] == 'title_abstract']
+        if human_decisions:
+            ai_decision = suggestion.get('decision')
+            # Check if any human agreed with AI
+            for hd in human_decisions:
+                ai_human_total += 1
+                if hd['decision'] == ai_decision:
+                    ai_human_agreement += 1
+    
+    ai_human_agreement_rate = (ai_human_agreement / ai_human_total * 100) if ai_human_total > 0 else None
+    
+    return {
+        "title_abstract": {
+            "agreements": ta_agreements,
+            "disagreements": ta_disagreements,
+            "single_reviewer": ta_single_reviewer,
+            "agreement_rate": round(ta_agreement_rate, 1) if ta_agreement_rate else None
+        },
+        "full_text": {
+            "agreements": ft_agreements,
+            "disagreements": ft_disagreements,
+            "single_reviewer": ft_single_reviewer,
+            "agreement_rate": round(ft_agreement_rate, 1) if ft_agreement_rate else None
+        },
+        "ai_screening": {
+            **ai_stats,
+            "ai_human_agreement_rate": round(ai_human_agreement_rate, 1) if ai_human_agreement_rate else None
+        },
+        "reviewer_stats": reviewer_stats,
+        "conflicts_resolved": await db.screening_conflicts.count_documents({
+            "project_id": project_id,
+            "status": ConflictStatus.RESOLVED.value
+        }),
+        "conflicts_pending": await db.screening_conflicts.count_documents({
+            "project_id": project_id,
+            "status": ConflictStatus.PENDING.value
+        })
+    }
+
+
 # ============== Studies ==============
 @api_router.post("/projects/{project_id}/studies", response_model=dict)
 async def create_study(project_id: str, study_data: StudyCreate):
