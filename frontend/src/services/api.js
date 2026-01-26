@@ -121,4 +121,38 @@ export const exportApi = {
   },
 };
 
+// Deduplication
+export const deduplicationApi = {
+  findDuplicates: (projectId, settings = {}) =>
+    api.get(`/projects/${projectId}/duplicates`, { params: settings }),
+  resolveDuplicates: (projectId, studyIds, primaryStudyId, userId = 'default_user') =>
+    api.post(
+      `/projects/${projectId}/duplicates/resolve`,
+      { study_ids: studyIds, primary_study_id: primaryStudyId },
+      { params: { user_id: userId } }
+    ),
+  markNotDuplicate: (projectId, studyIds, userId = 'default_user') =>
+    api.post(
+      `/projects/${projectId}/duplicates/not-duplicate`,
+      { study_ids: studyIds },
+      { params: { user_id: userId } }
+    ),
+  getStats: (projectId) => api.get(`/projects/${projectId}/duplicates/stats`),
+  getHistory: (projectId, limit = 100) =>
+    api.get(`/projects/${projectId}/duplicates/history`, { params: { limit } }),
+  undoResolution: (projectId, recordId, userId = 'default_user') =>
+    api.post(`/projects/${projectId}/duplicates/${recordId}/undo`, {}, { params: { user_id: userId } }),
+  autoDeduplicate: (projectId, titleThreshold = 0.95, userId = 'default_user') =>
+    api.post(
+      `/projects/${projectId}/duplicates/auto`,
+      {},
+      { params: { title_threshold: titleThreshold, user_id: userId } }
+    ),
+};
+
+// PRISMA
+export const prismaApi = {
+  getData: (projectId) => api.get(`/projects/${projectId}/prisma`),
+};
+
 export default api;

@@ -23,7 +23,9 @@ from models import (
     ScreeningRecord, ScreeningConflict, ConflictResolution, ConflictStatus,
     ExtractionTemplate, ExtractionTemplateCreate, ExtractionField, ExtractionFieldCreate,
     ExtractedData, ExtractedValue, AIExtractionSuggestion, ValueUpdate,
-    StudyScreeningView, AuditLog
+    StudyScreeningView, AuditLog,
+    DuplicateGroup, DeduplicationSettings, DuplicateResolution, NotDuplicateResolution,
+    DuplicateStats, PRISMAData
 )
 
 # Import services
@@ -34,6 +36,7 @@ from services.export_service import ExportService
 from services.llm_client import LLMClient
 from services.import_parsers import parse_import_file, detect_format
 from services.ai_screening_service import AIScreeningService
+from services.deduplication_service import DeduplicationService
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
@@ -53,6 +56,7 @@ if emergent_key:
 extraction_service = ExtractionService(db, llm_client)
 ai_screening_service = AIScreeningService(db, llm_client)
 export_service = ExportService(db)
+deduplication_service = DeduplicationService(db)
 
 # Create FastAPI app
 app = FastAPI(title="DataXRev API", version="1.0.0")
@@ -153,13 +157,19 @@ async def get_project_stats(project_id: str):
     ]
     cursor = db.studies.aggregate(pipeline)
     status_counts = {r['_id']: r['count'] async for r in cursor}
-    
+
     # Count pending conflicts
     conflicts_pending = await db.screening_conflicts.count_documents({
         "project_id": project_id,
         "status": ConflictStatus.PENDING.value
     })
-    
+
+    # Count duplicates removed
+    duplicates_removed = await db.studies.count_documents({
+        "project_id": project_id,
+        "is_duplicate": True
+    })
+
     return ProjectStats(
         total_studies=sum(status_counts.values()),
         imported=status_counts.get(StudyStatus.IMPORTED.value, 0),
@@ -169,7 +179,8 @@ async def get_project_stats(project_id: str):
         full_text_screened=status_counts.get(StudyStatus.FULL_TEXT_SCREENED.value, 0),
         included=status_counts.get(StudyStatus.INCLUDED.value, 0),
         excluded=status_counts.get(StudyStatus.EXCLUDED.value, 0),
-        conflicts_pending=conflicts_pending
+        conflicts_pending=conflicts_pending,
+        duplicates_removed=duplicates_removed
     )
 
 
@@ -883,6 +894,236 @@ async def export_extraction(
     )
 
 
+# ============== Deduplication ==============
+@api_router.get("/projects/{project_id}/duplicates")
+async def find_duplicates(
+    project_id: str,
+    title_threshold: float = Query(default=0.85, ge=0.5, le=1.0),
+    check_doi: bool = True,
+    check_pmid: bool = True,
+    check_title: bool = True,
+    check_authors: bool = True,
+    author_threshold: float = Query(default=0.5, ge=0.0, le=1.0)
+):
+    """Find potential duplicate studies in a project."""
+    duplicates = await deduplication_service.find_duplicates(
+        project_id=project_id,
+        title_threshold=title_threshold,
+        check_doi=check_doi,
+        check_pmid=check_pmid,
+        check_title=check_title,
+        check_authors=check_authors,
+        author_threshold=author_threshold
+    )
+    return duplicates
+
+
+@api_router.post("/projects/{project_id}/duplicates/resolve")
+async def resolve_duplicates(
+    project_id: str,
+    resolution: DuplicateResolution,
+    user_id: str = "default_user"
+):
+    """Mark studies as duplicates, keeping one as primary."""
+    try:
+        result = await deduplication_service.mark_as_duplicate(
+            project_id=project_id,
+            study_ids=resolution.study_ids,
+            primary_study_id=resolution.primary_study_id,
+            user_id=user_id
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@api_router.post("/projects/{project_id}/duplicates/not-duplicate")
+async def mark_not_duplicate(
+    project_id: str,
+    resolution: NotDuplicateResolution,
+    user_id: str = "default_user"
+):
+    """Mark studies as NOT duplicates (false positive)."""
+    result = await deduplication_service.mark_not_duplicate(
+        project_id=project_id,
+        study_ids=resolution.study_ids,
+        user_id=user_id
+    )
+    return result
+
+
+@api_router.get("/projects/{project_id}/duplicates/stats", response_model=DuplicateStats)
+async def get_duplicate_stats(project_id: str):
+    """Get deduplication statistics for a project."""
+    stats = await deduplication_service.get_duplicate_stats(project_id)
+    return stats
+
+
+@api_router.get("/projects/{project_id}/duplicates/history")
+async def get_duplicate_history(project_id: str, limit: int = 100):
+    """Get history of resolved duplicate groups."""
+    history = await deduplication_service.get_resolved_duplicates(
+        project_id=project_id,
+        limit=limit
+    )
+    return history
+
+
+@api_router.post("/projects/{project_id}/duplicates/{record_id}/undo")
+async def undo_duplicate_marking(
+    project_id: str,
+    record_id: str,
+    user_id: str = "default_user"
+):
+    """Undo a duplicate marking decision."""
+    try:
+        result = await deduplication_service.undo_duplicate_marking(
+            project_id=project_id,
+            duplicate_record_id=record_id,
+            user_id=user_id
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@api_router.post("/projects/{project_id}/duplicates/auto")
+async def auto_deduplicate(
+    project_id: str,
+    title_threshold: float = Query(default=0.95, ge=0.9, le=1.0),
+    user_id: str = "default_user"
+):
+    """Automatically remove high-confidence duplicates."""
+    result = await deduplication_service.auto_deduplicate(
+        project_id=project_id,
+        title_threshold=title_threshold,
+        user_id=user_id
+    )
+    return result
+
+
+# ============== PRISMA Flow Diagram ==============
+@api_router.get("/projects/{project_id}/prisma", response_model=PRISMAData)
+async def get_prisma_data(project_id: str):
+    """Get PRISMA 2020 flow diagram data for a project."""
+    # Verify project exists
+    project = await db.projects.find_one({"id": project_id})
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # Get study counts by status
+    pipeline = [
+        {"$match": {"project_id": project_id}},
+        {"$group": {"_id": "$status", "count": {"$sum": 1}}}
+    ]
+    cursor = db.studies.aggregate(pipeline)
+    status_counts = {r['_id']: r['count'] async for r in cursor}
+
+    # Get study counts by source
+    source_pipeline = [
+        {"$match": {"project_id": project_id, "is_duplicate": {"$ne": True}}},
+        {"$group": {"_id": "$source", "count": {"$sum": 1}}}
+    ]
+    source_cursor = db.studies.aggregate(source_pipeline)
+    source_counts = {r['_id'] or 'unknown': r['count'] async for r in source_cursor}
+
+    # Get duplicate stats
+    duplicate_stats = await deduplication_service.get_duplicate_stats(project_id)
+    duplicates_removed = duplicate_stats['duplicates_removed']
+
+    # Get total studies including duplicates
+    total_studies = await db.studies.count_documents({"project_id": project_id})
+
+    # Calculate PRISMA values
+    # Total identified = all studies ever imported (including duplicates)
+    records_identified_total = total_studies
+
+    # Split by source type (databases vs other)
+    database_sources = {'pubmed', 'scopus', 'web of science', 'embase', 'cochrane',
+                       'cinahl', 'psycinfo', 'eric', 'medline', 'database'}
+    records_from_databases = sum(
+        count for source, count in source_counts.items()
+        if source and source.lower() in database_sources
+    )
+    records_from_other = records_identified_total - records_from_databases - duplicates_removed
+
+    # Get exclusion reasons from screening records
+    exclusion_pipeline = [
+        {"$match": {"project_id": project_id, "decision": "exclude"}},
+        {"$group": {"_id": "$exclusion_reason", "count": {"$sum": 1}}}
+    ]
+    exclusion_cursor = db.screening_records.aggregate(exclusion_pipeline)
+    exclusion_reasons = {r['_id'] or 'Not specified': r['count'] async for r in exclusion_cursor}
+
+    # Calculate screening numbers
+    title_abstract_excluded = status_counts.get(StudyStatus.EXCLUDED.value, 0)
+
+    # Studies that made it past title/abstract screening
+    passed_ta_screening = (
+        status_counts.get(StudyStatus.TITLE_ABSTRACT_SCREENED.value, 0) +
+        status_counts.get(StudyStatus.FULL_TEXT_PENDING.value, 0) +
+        status_counts.get(StudyStatus.FULL_TEXT_SCREENED.value, 0) +
+        status_counts.get(StudyStatus.INCLUDED.value, 0)
+    )
+
+    # Full text assessed
+    full_text_assessed = (
+        status_counts.get(StudyStatus.FULL_TEXT_SCREENED.value, 0) +
+        status_counts.get(StudyStatus.INCLUDED.value, 0)
+    )
+
+    # Get full-text specific exclusions
+    ft_exclusion_pipeline = [
+        {"$match": {"project_id": project_id, "stage": "full_text", "decision": "exclude"}},
+        {"$group": {"_id": "$exclusion_reason", "count": {"$sum": 1}}}
+    ]
+    ft_exclusion_cursor = db.screening_records.aggregate(ft_exclusion_pipeline)
+    ft_exclusion_reasons = {r['_id'] or 'Not specified': r['count'] async for r in ft_exclusion_cursor}
+
+    # Records screened = total after duplicates removed
+    records_after_duplicates = total_studies - duplicates_removed
+
+    # Title/abstract exclusions
+    ta_exclusion_pipeline = [
+        {"$match": {"project_id": project_id, "stage": "title_abstract", "decision": "exclude"}},
+        {"$group": {"_id": None, "count": {"$sum": 1}}}
+    ]
+    ta_exclusion_cursor = db.screening_records.aggregate(ta_exclusion_pipeline)
+    ta_exclusion_result = await ta_exclusion_cursor.to_list(1)
+    ta_excluded = ta_exclusion_result[0]['count'] if ta_exclusion_result else 0
+
+    return PRISMAData(
+        # Identification
+        records_identified_databases=records_from_databases,
+        records_identified_registers=0,  # Could be expanded to track registers separately
+        records_identified_other=records_from_other if records_from_other > 0 else 0,
+        records_removed_before_screening=duplicates_removed,
+        duplicates_removed=duplicates_removed,
+        records_marked_ineligible=0,
+        records_removed_other_reasons=0,
+
+        # Screening
+        records_screened=records_after_duplicates,
+        records_excluded_screening=ta_excluded,
+
+        # Retrieval
+        reports_sought_retrieval=passed_ta_screening,
+        reports_not_retrieved=status_counts.get(StudyStatus.FULL_TEXT_PENDING.value, 0),
+
+        # Eligibility
+        reports_assessed_eligibility=full_text_assessed,
+        reports_excluded_eligibility=len([s for s in ft_exclusion_reasons.values()]),
+        exclusion_reasons=ft_exclusion_reasons,
+
+        # Included
+        studies_included_review=status_counts.get(StudyStatus.INCLUDED.value, 0),
+        reports_included_review=status_counts.get(StudyStatus.INCLUDED.value, 0),
+
+        # Sources
+        sources=source_counts
+    )
+
+
 # Include router
 app.include_router(api_router)
 
@@ -903,22 +1144,30 @@ async def startup():
     await db.studies.create_index("project_id")
     await db.studies.create_index("status")
     await db.studies.create_index([("project_id", 1), ("status", 1)])
-    
+    await db.studies.create_index([("project_id", 1), ("is_duplicate", 1)])
+    await db.studies.create_index([("project_id", 1), ("doi", 1)])
+    await db.studies.create_index([("project_id", 1), ("pmid", 1)])
+
     # Screening records indexes
     await db.screening_records.create_index("study_id")
     await db.screening_records.create_index([("study_id", 1), ("stage", 1), ("reviewer_id", 1)])
-    
+
     # Conflicts indexes
     await db.screening_conflicts.create_index("project_id")
     await db.screening_conflicts.create_index([("project_id", 1), ("status", 1)])
-    
+
     # Extraction indexes
     await db.extraction_templates.create_index("project_id")
     await db.extracted_data.create_index([("study_id", 1), ("template_id", 1)])
-    
+
     # Audit logs indexes
     await db.audit_logs.create_index([("project_id", 1), ("timestamp", -1)])
-    
+
+    # Deduplication indexes
+    await db.duplicate_records.create_index("project_id")
+    await db.duplicate_records.create_index([("project_id", 1), ("resolved_at", -1)])
+    await db.not_duplicate_records.create_index("project_id")
+
     logger.info("Database indexes created")
 
 

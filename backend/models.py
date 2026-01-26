@@ -293,3 +293,84 @@ class ProjectStats(BaseModel):
     included: int = 0
     excluded: int = 0
     conflicts_pending: int = 0
+    duplicates_removed: int = 0
+
+
+# Deduplication Models
+class DuplicateGroup(BaseModel):
+    """A group of potential duplicate studies."""
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=generate_id)
+    match_type: str  # "doi", "pmid", "title_similarity"
+    confidence: float  # 0.0 to 1.0
+    study_ids: List[str]
+    studies: List[Dict[str, Any]] = Field(default_factory=list)
+    doi: Optional[str] = None
+    pmid: Optional[str] = None
+    author_overlap: Optional[float] = None
+
+
+class DeduplicationSettings(BaseModel):
+    """Settings for deduplication algorithm."""
+    title_threshold: float = 0.85
+    check_doi: bool = True
+    check_pmid: bool = True
+    check_title: bool = True
+    check_authors: bool = True
+    author_threshold: float = 0.5
+
+
+class DuplicateResolution(BaseModel):
+    """Request to resolve a duplicate group."""
+    study_ids: List[str]
+    primary_study_id: str
+
+
+class NotDuplicateResolution(BaseModel):
+    """Request to mark studies as not duplicates."""
+    study_ids: List[str]
+
+
+class DuplicateStats(BaseModel):
+    """Deduplication statistics for a project."""
+    total_studies: int = 0
+    duplicates_removed: int = 0
+    unique_studies: int = 0
+    duplicate_groups_resolved: int = 0
+    false_positives_marked: int = 0
+
+
+# PRISMA Flow Diagram Models
+class PRISMAData(BaseModel):
+    """Data for PRISMA 2020 flow diagram."""
+    model_config = ConfigDict(extra="ignore")
+
+    # Identification
+    records_identified_databases: int = 0
+    records_identified_registers: int = 0
+    records_identified_other: int = 0
+    records_removed_before_screening: int = 0
+    duplicates_removed: int = 0
+    records_marked_ineligible: int = 0
+    records_removed_other_reasons: int = 0
+
+    # Screening
+    records_screened: int = 0
+    records_excluded_screening: int = 0
+
+    # Retrieval
+    reports_sought_retrieval: int = 0
+    reports_not_retrieved: int = 0
+
+    # Eligibility
+    reports_assessed_eligibility: int = 0
+    reports_excluded_eligibility: int = 0
+    exclusion_reasons: Dict[str, int] = Field(default_factory=dict)
+
+    # Included
+    studies_included_review: int = 0
+    reports_included_review: int = 0
+
+    # Sources breakdown
+    sources: Dict[str, int] = Field(default_factory=dict)

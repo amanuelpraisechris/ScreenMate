@@ -9,6 +9,8 @@ import ConflictsPanel from './ConflictsPanel';
 import ExtractionWorkspace from './ExtractionWorkspace';
 import ExportPanel from './ExportPanel';
 import AgreementMetrics from './AgreementMetrics';
+import DeduplicationPanel from './DeduplicationPanel';
+import PRISMAFlowDiagram from './PRISMAFlowDiagram';
 import {
   ArrowLeft,
   FileText,
@@ -23,6 +25,8 @@ import {
   Search,
   Database,
   BarChart3,
+  Copy,
+  GitBranch,
 } from 'lucide-react';
 
 const ProjectWorkspace = ({ onBack }) => {
@@ -100,9 +104,13 @@ const ProjectWorkspace = ({ onBack }) => {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-6">
+          <TabsList className="mb-6 flex-wrap">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="import">Import Studies</TabsTrigger>
+            <TabsTrigger value="deduplication">
+              <Copy className="w-4 h-4 mr-1" />
+              Deduplication
+            </TabsTrigger>
             <TabsTrigger value="screening">Screening</TabsTrigger>
             <TabsTrigger value="metrics">
               <BarChart3 className="w-4 h-4 mr-1" />
@@ -117,6 +125,10 @@ const ProjectWorkspace = ({ onBack }) => {
               )}
             </TabsTrigger>
             <TabsTrigger value="extraction">Data Extraction</TabsTrigger>
+            <TabsTrigger value="prisma">
+              <GitBranch className="w-4 h-4 mr-1" />
+              PRISMA
+            </TabsTrigger>
             <TabsTrigger value="export">Export</TabsTrigger>
           </TabsList>
 
@@ -198,7 +210,7 @@ const ProjectWorkspace = ({ onBack }) => {
             </div>
 
             {/* Quick Actions */}
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
               <button
                 onClick={() => setActiveTab('import')}
                 className="bg-white rounded-xl border border-gray-200 p-6 text-left hover:shadow-md hover:border-[#6B8E7B] transition-all"
@@ -207,7 +219,16 @@ const ProjectWorkspace = ({ onBack }) => {
                 <h4 className="font-semibold text-gray-900">Import Studies</h4>
                 <p className="text-sm text-gray-500 mt-1">Add studies from various sources</p>
               </button>
-              
+
+              <button
+                onClick={() => setActiveTab('deduplication')}
+                className="bg-white rounded-xl border border-gray-200 p-6 text-left hover:shadow-md hover:border-[#6B8E7B] transition-all"
+              >
+                <Copy className="w-8 h-8 text-[#6B8E7B] mb-3" />
+                <h4 className="font-semibold text-gray-900">Deduplication</h4>
+                <p className="text-sm text-gray-500 mt-1">Find and remove duplicate studies</p>
+              </button>
+
               <button
                 onClick={() => {
                   setScreeningStage('title_abstract');
@@ -221,7 +242,7 @@ const ProjectWorkspace = ({ onBack }) => {
                   {projectStats.imported + projectStats.title_abstract_pending} pending
                 </p>
               </button>
-              
+
               <button
                 onClick={() => {
                   setScreeningStage('full_text');
@@ -235,7 +256,7 @@ const ProjectWorkspace = ({ onBack }) => {
                   {projectStats.full_text_pending} pending
                 </p>
               </button>
-              
+
               <button
                 onClick={() => setActiveTab('extraction')}
                 className="bg-white rounded-xl border border-gray-200 p-6 text-left hover:shadow-md hover:border-[#6B8E7B] transition-all"
@@ -246,12 +267,26 @@ const ProjectWorkspace = ({ onBack }) => {
                   {projectStats.included} studies to extract
                 </p>
               </button>
+
+              <button
+                onClick={() => setActiveTab('prisma')}
+                className="bg-white rounded-xl border border-gray-200 p-6 text-left hover:shadow-md hover:border-[#6B8E7B] transition-all"
+              >
+                <GitBranch className="w-8 h-8 text-[#6B8E7B] mb-3" />
+                <h4 className="font-semibold text-gray-900">PRISMA Diagram</h4>
+                <p className="text-sm text-gray-500 mt-1">View flow diagram for reporting</p>
+              </button>
             </div>
           </TabsContent>
 
           {/* Import Tab */}
           <TabsContent value="import">
             <StudyImport />
+          </TabsContent>
+
+          {/* Deduplication Tab */}
+          <TabsContent value="deduplication">
+            <DeduplicationPanel />
           </TabsContent>
 
           {/* Screening Tab */}
@@ -272,6 +307,11 @@ const ProjectWorkspace = ({ onBack }) => {
           {/* Extraction Tab */}
           <TabsContent value="extraction">
             <ExtractionWorkspace />
+          </TabsContent>
+
+          {/* PRISMA Tab */}
+          <TabsContent value="prisma">
+            <PRISMAFlowDiagram />
           </TabsContent>
 
           {/* Export Tab */}
